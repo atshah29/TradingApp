@@ -1,0 +1,18 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "cmake-build",
+            "type": "shell",
+            "command": "cmake",
+            "args": [
+                "--build",
+                "${command:cmake.buildDirectory}"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        }
+    ]
+}

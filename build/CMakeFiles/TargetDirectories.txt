@@ -1,0 +1,3 @@
+/Users/aadeshshah/TradingApp/build/CMakeFiles/TradingApp.dir
+/Users/aadeshshah/TradingApp/build/CMakeFiles/edit_cache.dir
+/Users/aadeshshah/TradingApp/build/CMakeFiles/rebuild_cache.dir

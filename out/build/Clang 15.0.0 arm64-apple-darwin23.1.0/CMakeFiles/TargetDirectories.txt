@@ -1,0 +1,3 @@
+/Users/aadeshshah/TradingApp/out/build/Clang 15.0.0 arm64-apple-darwin23.1.0/CMakeFiles/TradingApp.dir
+/Users/aadeshshah/TradingApp/out/build/Clang 15.0.0 arm64-apple-darwin23.1.0/CMakeFiles/edit_cache.dir
+/Users/aadeshshah/TradingApp/out/build/Clang 15.0.0 arm64-apple-darwin23.1.0/CMakeFiles/rebuild_cache.dir

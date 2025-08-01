@@ -1,0 +1,14 @@
+[
+{
+  "directory": "/Users/aadeshshah/TradingApp/build",
+  "command": "/usr/bin/c++  -I/opt/homebrew/opt/mysql-connector-c++/include/mysqlx -g -std=gnu++17 -arch arm64 -o CMakeFiles/TradingApp.dir/main.cpp.o -c /Users/aadeshshah/TradingApp/main.cpp",
+  "file": "/Users/aadeshshah/TradingApp/main.cpp",
+  "output": "CMakeFiles/TradingApp.dir/main.cpp.o"
+},
+{
+  "directory": "/Users/aadeshshah/TradingApp/build",
+  "command": "/usr/bin/c++  -I/opt/homebrew/opt/mysql-connector-c++/include/mysqlx -g -std=gnu++17 -arch arm64 -o CMakeFiles/TradingApp.dir/database.cpp.o -c /Users/aadeshshah/TradingApp/database.cpp",
+  "file": "/Users/aadeshshah/TradingApp/database.cpp",
+  "output": "CMakeFiles/TradingApp.dir/database.cpp.o"
+}
+]
