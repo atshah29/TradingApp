@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 import string
 
 
-#include method to look for symbol AND actual stock name 
+
 
 warnings.filterwarnings("ignore")
 
@@ -19,7 +19,7 @@ warnings.filterwarnings("ignore")
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_PATH = os.path.join(SCRIPT_DIR, "models/finetuned-finbert-2")
 ENV_PATH = os.path.join(SCRIPT_DIR, "apis.env")
-load_dotenv(ENV_PATH)  # Specify the path to your .env file
+load_dotenv(ENV_PATH)  # Specify the path to .env file
 
 
 if not os.path.exists(MODEL_PATH):

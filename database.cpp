@@ -35,7 +35,7 @@ Database::~Database(){
 
 Database::Database() 
 {
-    // Constructor body can be empty, schema will be initialized when connect() is called
+    // Constructor body is empty because the schema will be initialized when connect() is called
 }
 
 
