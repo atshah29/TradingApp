@@ -1,4 +1,4 @@
-🚀 TradingApp
+🚀 TradingApp - Aadesh Shah
 
 A C++ Trading Application with SQL database integration, Python-based sentiment analysis, and Machine Learning for market insights.
 
