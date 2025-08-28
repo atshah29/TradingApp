@@ -3,6 +3,7 @@
 #include <vector>
 #include <unordered_map>
 #include <fstream>
+#include <thread>
 
 
 void Database::connect(const std::string& url){
@@ -14,8 +15,9 @@ void Database::connect(const std::string& url){
     if(session){
         std::cout << "SESSION FOUND" << std::endl;
     }
-    schema = std::make_unique<mysqlx::Schema>(session->getSchema("trading", true)); //createSchema?
-    updateStockPrices(); // Update stock prices on connection
+    schema = std::make_unique<mysqlx::Schema>(session->getSchema("trading", true)); //createSchema
+    std::thread updateStocksThread (&Database::updateStockPrices, this); // Update stock prices on connection
+    updateStocksThread.detach();
 }
 
 mysqlx::Schema &Database::getSchema() const{
@@ -430,11 +432,13 @@ void Database::viewTransactions (int userID){
 
 void Database::updateStockPrices() {
     int result = std::system ("python3 /Users/aadeshshah/TradingApp/update_stocks.py"); // Assuming you have a Python script to update stock prices
-    if(result != 0) {
-        std::cerr << "Failed to update stock prices. Please check the Python script or API is overused" << std::endl;
-    } else {
-        std::cout << "Stock prices updated successfully." << std::endl;
-    }
+    // if(result != 0) {
+    //     std::cerr << "Failed to update stock prices. Please check the Python script or API is overused" << std::endl;
+    // } else {
+    //     std::cout << "Stock prices updated successfully." << std::endl;
+    // }
+
+    
 }
 
 
