@@ -29,9 +29,6 @@ void sentimentUpdater(Database& db, const std::vector<std::string>& stockList) {
 }
 
 
-
-
-
 int main(int, char**){
     // Initialize the Python interpreter
     std::cout << "Hello, from TradingApp!\n";
