@@ -3,7 +3,7 @@
 import torch
 import warnings
 import tweepy 
-from transformers import AutoTokenizer, AutoModelForSequenceClassification, pipeline
+from transformers import AutoTokenizer, AutoModelForSequenceClassification, pipeline, logging
 import requests
 import datetime
 import os
@@ -12,7 +12,7 @@ import string
 
 
 
-
+logging.set_verbosity_error()
 warnings.filterwarnings("ignore")
 
 

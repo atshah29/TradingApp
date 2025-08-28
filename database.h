@@ -47,7 +47,9 @@ class Database {
 
     void updateStockPrices();
 
-    void getSentiment(const std::string& stockSymbol, bool useTwitter);
+    std::string getSentiment(const std::string& stockSymbol, bool useTwitter);
+
+    std::vector<std::string> returnStocks();
 }
 
 ;

@@ -438,17 +438,51 @@ void Database::updateStockPrices() {
 }
 
 
+std::string execCommand(const std::string& cmd) {
+    std::array<char, 128> buffer;
+    std::string result;
 
-void Database::getSentiment(const std::string& stockSymbol, bool useTwitter = false) {
-    // Call Python script
-    std::string cmd = "python3 /Users/aadeshshah/TradingApp/sentiment.py " + stockSymbol + " " + (useTwitter ? "1" : "0");
-    int ret = std::system(cmd.c_str());
-    
-    if (ret != 0) {
-        throw std::runtime_error("Python script failed.");
+    // Open pipe to file
+    std::unique_ptr<FILE, decltype(&pclose)> pipe(popen(cmd.c_str(), "r"), pclose);
+    if (!pipe) {
+        throw std::runtime_error("popen() failed!");
     }
+
+    // read until end of process:
+    while (fgets(buffer.data(), buffer.size(), pipe.get()) != nullptr) {
+        result += buffer.data();
+    }
+    return result;
 }
 
+std::string Database::getSentiment(const std::string& stockSymbol, bool useTwitter) {
+    std::string cmd = "python3 /Users/aadeshshah/TradingApp/sentiment.py " 
+                    + stockSymbol + " " + (useTwitter ? "1" : "0");
+
+    std::string output = execCommand(cmd);
+    if (output.empty()) {
+        throw std::runtime_error("Python script returned no output.");
+    }
+    return output; // return the captured sentiment string
+}
+
+
+std::vector<std::string> Database::returnStocks(){
+    std::vector<std::string> names;
+    mysqlx::Table stocks = schema->getTable("Stocks");
+
+    mysqlx::RowResult stockNames = stocks.select("Symbol")
+                                   .execute();
+
+    std::vector <mysqlx::Row> resultRows = stockNames.fetchAll();
+
+    for (auto& row : resultRows){
+        names.emplace_back((std::string) row.get(0));
+    }
+
+    return names;
+
+} 
 
 
 

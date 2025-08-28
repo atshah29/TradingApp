@@ -1,5 +1,34 @@
 #include <iostream>
 #include "database.h"
+#include <unordered_map>
+#include <mutex>
+#include <string>
+#include <thread>
+#include <chrono>
+#include <vector>
+
+std::unordered_map<std::string, std::string> sentimentCache;
+std::mutex cacheMutex;
+
+void sentimentUpdater(Database& db, const std::vector<std::string>& stockList) {
+    while (true) {
+        for (const auto& symbol : stockList) {
+            try {
+                auto result = db.getSentiment(symbol, false); // false = do not use Twitter
+                {
+                    std::lock_guard<std::mutex> lock(cacheMutex);
+                    sentimentCache[symbol] = result;
+                }
+                // std::cout << "[Updater] Cached sentiment for " << symbol << "\n";
+            } catch (const std::exception& e) {
+                std::cout << "[Updater] Error updating " << symbol << ": " << e.what() << "\n";
+            }
+        }
+        std::this_thread::sleep_for(std::chrono::minutes(2)); // refresh every 2 mins
+    }
+}
+
+
 
 
 
@@ -11,6 +40,11 @@ int main(int, char**){
     std::cout << "Enter MySQL connection URL (e.g., mysqlx://user:password@localhost:33060): ";
     std::getline(std::cin, url);
     db.connect(url);
+
+    std::vector<std::string> trackedStocks = db.returnStocks();
+    std::thread updaterThread(sentimentUpdater, std::ref(db), trackedStocks);
+    updaterThread.detach(); // run in background
+
 
     while (true) {
         std::cout << "\n--- TradingApp Menu ---\n";
@@ -80,7 +114,21 @@ int main(int, char**){
                     std::cin >> useTwitter;
                     bool useTwitterBool = useTwitter; 
                     try {
-                        db.getSentiment(stockSymbol, useTwitterBool);
+                        if (!useTwitterBool){
+                            std::lock_guard<std::mutex> lock(cacheMutex);
+                            auto it = sentimentCache.find(stockSymbol);
+                            if (it != sentimentCache.end()) {
+                                std::cout << "Cached Sentiment: " << it->second << "\n";
+                            } else {
+                                std::cout << "Not cached, fetching live...\n";
+                                std::string sentiment = db.getSentiment(stockSymbol, useTwitterBool);
+                                sentimentCache[stockSymbol] = sentiment; // store it
+                                std::cout << sentiment << "\n";
+                            }
+                        }
+                        else{
+                            std::cout<<db.getSentiment(stockSymbol, useTwitterBool);
+                        }
                     } catch (const std::exception& e) {
                         std::cout << "Error retrieving sentiment: " << e.what() << "\n";
                 }

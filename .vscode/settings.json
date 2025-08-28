@@ -63,6 +63,7 @@
         "algorithm": "cpp",
         "typeindex": "cpp",
         "unordered_set": "cpp",
-        "stack": "cpp"
+        "stack": "cpp",
+        "fstream": "cpp"
     }
 }
