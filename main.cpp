@@ -112,7 +112,7 @@ int main(int, char**){
                     bool useTwitterBool = useTwitter; 
                     try {
                         if (!useTwitterBool){
-                            std::lock_guard<std::mutex> lock(cacheMutex);
+                            std::lock_guard<std::mutex> lock(cacheMutex); // lock the cache in case we need to update it
                             auto it = sentimentCache.find(stockSymbol);
                             if (it != sentimentCache.end()) {
                                 std::cout << "Cached Sentiment: " << it->second << "\n";
