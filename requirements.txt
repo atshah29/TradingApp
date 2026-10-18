@@ -1,0 +1,7 @@
+beautifulsoup4
+mysql-connector-python
+python-dotenv
+requests
+torch
+transformers
+tweepy

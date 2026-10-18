@@ -1,20 +1,46 @@
-# Ignore environment files
+# Local credentials
 .env
+.env.*
+!.env.example
 apis.env
 
-# Ignore build directories
+# CMake build output
 /build/
 /out/
-
-# Ignore CMake cache files
+/cmake-build-*/
+CMakeUserPresets.json
 CMakeCache.txt
 CMakeFiles/
+.cmake/
 cmake_install.cmake
+CTestTestfile.cmake
+compile_commands.json
 Makefile
+build.ninja
+.ninja_deps
+.ninja_log
+*.o
+*.obj
+*.a
+*.so
+*.dylib
+*.exe
+*.dSYM/
 
-# Ignore macOS system files
-.DS_Storemodels/
+# Python environments and caches
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
 
-
-#Models too big
+# Local model assets (provided separately)
+/models/
 /Models/
+
+# macOS metadata
+.DS_Store
+._*
+
+# Redundant local checkout of this repository
+/TradingApp/
