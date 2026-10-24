@@ -8,7 +8,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 add_executable(TradingApp main.cpp database.cpp)
 
 # Include directories for headers
-target_include_directories(TradingApp PRIVATE /opt/homebrew/opt/mysql-connector-c++/include/mysqlx/)
+target_include_directories(TradingApp PRIVATE /opt/homebrew/opt/mysql-connector-c++/include)
 
 # Link directory for .dylib files
 target_link_directories(TradingApp PRIVATE /opt/homebrew/opt/mysql-connector-c++/lib)
