@@ -1,160 +1,205 @@
-#include <iostream>
 #include "database.h"
-#include <unordered_map>
-#include <mutex>
-#include <string>
-#include <thread>
+#include "order_processor.h"
+
 #include <chrono>
-#include <vector>
+#include <condition_variable>
+#include <iostream>
+#include <limits>
+#include <mutex>
+#include <sstream>
+#include <thread>
+#include <unordered_map>
 
-std::unordered_map<std::string, std::string> sentimentCache;
-std::mutex cacheMutex;
+namespace {
+class EndOfInput {};
 
-void sentimentUpdater(Database& db, const std::vector<std::string>& stockList) {
-    while (true) {
-        for (const auto& symbol : stockList) {
-            try {
-                auto result = db.getSentiment(symbol, false); // false = do not use Twitter
-                {
-                    std::lock_guard<std::mutex> lock(cacheMutex);
-                    sentimentCache[symbol] = result;
+template<class T>
+T read(const char* prompt) {
+    std::cout << prompt;
+    std::string line;
+    if (!std::getline(std::cin, line)) throw EndOfInput{};
+    std::istringstream input(line);
+    T value;
+    if (!(input >> value)) throw std::invalid_argument("Invalid input.");
+    input >> std::ws;
+    if (!input.eof()) throw std::invalid_argument("Unexpected text after input.");
+    return value;
+}
+
+class MarketData {
+public:
+    MarketData(std::vector<std::string> symbols, bool enabled) {
+        if (!enabled) return;
+        worker_ = std::thread([this, symbols = std::move(symbols)] {
+            try { Database::updateStockPrices(); }
+            catch (const std::exception& error) { setError(error.what()); }
+            while (true) {
+                for (const auto& symbol : symbols) {
+                    {
+                        std::lock_guard<std::mutex> lock(mutex_);
+                        if (stopping_) return;
+                    }
+                    try {
+                        auto value = Database::getSentiment(symbol, false);
+                        std::lock_guard<std::mutex> lock(mutex_);
+                        cache_[symbol] = std::move(value);
+                    } catch (const std::exception& error) { setError(error.what()); }
                 }
-                // std::cout << "[Updater] Cached sentiment for " << symbol << "\n";
-            } catch (const std::exception& e) {
-                std::cout << "[Updater] Error updating " << symbol << ": " << e.what() << "\n";
+                std::unique_lock<std::mutex> lock(mutex_);
+                if (wake_.wait_for(lock, std::chrono::minutes(2), [this] { return stopping_; })) return;
             }
+        });
+    }
+    ~MarketData() {
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
+            stopping_ = true;
         }
-        std::this_thread::sleep_for(std::chrono::minutes(2)); // refresh every 2 mins
+        wake_.notify_all();
+        if (worker_.joinable()) worker_.join();
+    }
+    std::string sentiment(const std::string& symbol, bool twitter) {
+        if (!twitter) {
+            std::lock_guard<std::mutex> lock(mutex_);
+            auto found = cache_.find(symbol);
+            if (found != cache_.end()) return "Cached: " + found->second;
+        }
+        auto value = Database::getSentiment(symbol, twitter);
+        if (!twitter) {
+            std::lock_guard<std::mutex> lock(mutex_);
+            cache_[symbol] = value;
+        }
+        return value;
+    }
+    std::string lastError() {
+        std::lock_guard<std::mutex> lock(mutex_);
+        return error_;
+    }
+private:
+    void setError(std::string error) {
+        std::lock_guard<std::mutex> lock(mutex_);
+        error_ = std::move(error);
+    }
+    std::mutex mutex_;
+    std::condition_variable wake_;
+    std::unordered_map<std::string, std::string> cache_;
+    std::string error_;
+    bool stopping_ = false;
+    std::thread worker_;
+};
+
+void showOrders(const OrderProcessor& orders, int userID) {
+    const auto results = orders.ordersFor(userID);
+    if (results.empty()) std::cout << "No orders submitted in this session.\n";
+    for (const auto& result : results) {
+        std::cout << '#' << result.order.id << ' '
+                  << (result.order.side == OrderSide::Buy ? "Buy " : "Sell ")
+                  << result.order.quantity << ' ' << result.order.symbol
+                  << " | " << statusName(result.status);
+        if (!result.reason.empty()) std::cout << " | " << result.reason;
+        if (result.finished != std::chrono::steady_clock::time_point{}) {
+            std::cout << " | " << std::chrono::duration<double, std::milli>(
+                result.finished - result.submitted).count() << " ms";
+        }
+        if (result.status == OrderStatus::Failed) {
+            std::cout << " | Verify transaction history before resubmitting; the outcome may be unknown.";
+        }
+        std::cout << '\n';
     }
 }
 
-
-int main(int, char**){
-    // Initialize the Python interpreter
-    std::cout << "Hello, from TradingApp!\n";
-    Database db;
-    std::string url;
-    std::cout << "Enter MySQL connection URL (e.g., mysqlx://user:password@localhost:33060): ";
-    std::getline(std::cin, url);
-    db.connect(url);
-
-    std::vector<std::string> trackedStocks = db.returnStocks();
-    std::thread updaterThread(sentimentUpdater, std::ref(db), trackedStocks);
-    updaterThread.detach(); // run in background
-
-
+void userMenu(Database& db, OrderProcessor& orders, MarketData& market, int userID) {
     while (true) {
-        std::cout << "\n--- TradingApp Menu ---\n";
-        std::cout << "1. Login as Existing User\n";
-        std::cout << "2. Create New User\n";
-        std::cout << "3. Exit\n";
-        std::cout << "Enter your choice: ";
-        int choice;
-        std::cin >> choice;
-
-        if (choice == 1) {
-            std::cout << "Enter Username: ";
-            std::string username;
-            std::cin >> username;
-            std::cout << "Enter Password: ";
-            std::string password;
-            std::cin >> password;
-            int userID = db.loginUser(username, password);
-
-            while(true){
-                std::cout << "\n--- "<<username<<" Menu ---\n";
-                std::cout << "1. Deposit Money\n";
-                std::cout << "2. Buy Stock\n";
-                std::cout << "3. Sell Stock\n";
-                std::cout << "4. View Portfolio\n";
-                std::cout << "5. View Transactions\n";
-                std::cout << "6. Return Stock Sentiment\n";
-                std::cout << "7. Logout\n";
-                std::cout << "Enter your choice: ";
-                int userChoice;
-                std::cin >> userChoice;
-
-                if (userChoice == 1) {
-                    std::cout << "Enter amount to deposit: ";
-                    double amount;
-                    std::cin >> amount;
-                    
-                    db.depositMoney(userID, amount);
-                } else if (userChoice == 2) {
-                    std::cout << "Enter stock symbol: ";
-                    std::string stockSymbol;
-                    std::cin >> stockSymbol;
-                    std::cout << "Enter quantity: ";
-                    int quantity;
-                    std::cin >> quantity;
-                    
-                    db.buyStock(userID, stockSymbol, quantity);
-                } else if (userChoice == 3) {
-                    std::cout << "Enter stock symbol: ";
-                    std::string stockSymbol;
-                    std::cin >> stockSymbol;
-                    std::cout << "Enter quantity: ";
-                    int quantity;
-                    std::cin >> quantity;
-                    
-                    db.sellStock(userID, stockSymbol, quantity);
-                } else if (userChoice == 4) {
-                    db.viewPortfolio(userID);
-                } else if (userChoice == 5) {
-                    db.viewTransactions(userID);
-                } else if (userChoice == 6) {
-                    std::cout << "Enter stock symbol for sentiment analysis: ";
-                    std::string stockSymbol;
-                    std::cin >> stockSymbol;
-                    std::cout << "Use Twitter for sentiment analysis? (1 for Yes, 0 for No): ";
-                    int useTwitter;
-                    std::cin >> useTwitter;
-                    bool useTwitterBool = useTwitter; 
-                    try {
-                        if (!useTwitterBool){
-                            std::lock_guard<std::mutex> lock(cacheMutex); // lock the cache in case we need to update it
-                            auto it = sentimentCache.find(stockSymbol);
-                            if (it != sentimentCache.end()) {
-                                std::cout << "Cached Sentiment: " << it->second << "\n";
-                            } else {
-                                std::cout << "Not cached, fetching live...\n";
-                                std::string sentiment = db.getSentiment(stockSymbol, useTwitterBool);
-                                sentimentCache[stockSymbol] = sentiment; // store it
-                                std::cout << sentiment << "\n";
-                            }
-                        }
-                        else{
-                            std::cout<<db.getSentiment(stockSymbol, useTwitterBool);
-                        }
-                    } catch (const std::exception& e) {
-                        std::cout << "Error retrieving sentiment: " << e.what() << "\n";
-                }
-                } else if (userChoice == 7) {
-                    std::cout << "Logging out...\n";
-                    break;
-                } else {
-                    std::cout << "Invalid choice. Try again.\n";
-                }
+        try {
+            const int choice = read<int>(
+                "\n1. Deposit money\n2. Buy stock\n3. Sell stock\n4. View portfolio\n"
+                "5. View transactions\n6. Stock sentiment\n7. Logout\n8. Order status\nChoice: ");
+            if (choice == 1) {
+                db.depositMoney(userID, read<double>("Amount: "));
+                std::cout << "Deposit complete.\n";
+            } else if (choice == 2 || choice == 3) {
+                const auto symbol = read<std::string>("Stock symbol (uppercase): ");
+                const int quantity = read<int>("Quantity: ");
+                const auto id = orders.submit(userID, symbol, quantity,
+                    choice == 2 ? OrderSide::Buy : OrderSide::Sell);
+                std::cout << "Order #" << id << " submitted. Choose 8 to check its status.\n";
+            } else if (choice == 4) {
+                db.viewPortfolio(userID);
+            } else if (choice == 5) {
+                db.viewTransactions(userID);
+            } else if (choice == 6) {
+                const auto symbol = read<std::string>("Stock symbol (uppercase): ");
+                const int twitter = read<int>("Include Twitter/X? (1=yes, 0=no): ");
+                if (twitter != 0 && twitter != 1) throw std::invalid_argument("Enter 0 or 1.");
+                const auto error = market.lastError();
+                if (!error.empty()) std::cout << "Last background update error: " << error << '\n';
+                std::cout << market.sentiment(symbol, twitter == 1);
+            } else if (choice == 7) {
+                return;
+            } else if (choice == 8) {
+                showOrders(orders, userID);
+            } else {
+                std::cout << "Invalid choice.\n";
             }
-        } else if (choice == 2) {
-            std::cout << "Enter username: ";
-            std::string username;
-            std::cin >> username;
-            std::cout << "Enter password: ";
-            std::string password;
-            std::cin >> password;
-            
-
-            int newUserID = db.createUser(username, password);
-            std::cout << "User created successfully! Your User ID is: " << newUserID << "\n";
-        } else if (choice == 3) {
-            std::cout << "Exiting application. Goodbye!\n";
-            break;
-        } else {
-            std::cout << "Invalid choice. Please try again.\n";
+        } catch (const std::exception& error) {
+            std::cout << "Error: " << error.what() << '\n';
         }
     }
+}
+}
 
-
-    return 0;
+int main(int argc, char** argv) {
+    try {
+        std::size_t workerCount = 4;
+        bool marketEnabled = true;
+        for (int i = 1; i < argc; ++i) {
+            const std::string arg = argv[i];
+            if (arg == "--no-market-data") marketEnabled = false;
+            else if (arg == "--workers" && i + 1 < argc) {
+                const std::string count = argv[++i];
+                std::size_t end;
+                workerCount = std::stoul(count, &end);
+                if (end != count.size() || workerCount == 0 || workerCount > 64) {
+                    throw std::invalid_argument("Worker count must be between 1 and 64.");
+                }
+            } else {
+                throw std::invalid_argument("Usage: TradingApp [--workers 1..64] [--no-market-data]");
+            }
+        }
+        const auto url = read<std::string>("MySQL X connection URL (mysqlx://user:password@localhost:33060): ");
+        Database db;
+        db.connect(url);
+        OrderProcessor orders(workerCount, [url] {
+            auto connection = std::make_shared<Database>();
+            connection->connect(url);
+            return [connection](const Order& order) { connection->executeOrder(order); };
+        });
+        MarketData market(db.returnStocks(), marketEnabled);
+        std::cout << workerCount << " order workers ready.\n";
+        try {
+            while (true) {
+                try {
+                    const int choice = read<int>("\n1. Login\n2. Create user\n3. Exit\nChoice: ");
+                    if (choice == 3) break;
+                    if (choice != 1 && choice != 2) { std::cout << "Invalid choice.\n"; continue; }
+                    const auto username = read<std::string>("Username: ");
+                    const auto password = read<std::string>("Password: ");
+                    if (choice == 2) {
+                        std::cout << "Created user #" << db.createUser(username, password) << '\n';
+                    } else {
+                        userMenu(db, orders, market, db.loginUser(username, password));
+                    }
+                } catch (const std::exception& error) {
+                    std::cout << "Error: " << error.what() << '\n';
+                }
+            }
+        } catch (const EndOfInput&) {}
+        std::cout << "Finishing accepted orders and stopping background work...\n";
+        orders.shutdown();
+    } catch (const EndOfInput&) {
+        return 0;
+    } catch (const std::exception& error) {
+        std::cerr << "Error: " << error.what() << '\n';
+        return 1;
+    }
 }
