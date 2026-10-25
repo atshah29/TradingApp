@@ -67,10 +67,10 @@ def get_sentiment(symbol, useTwitter = False):
 
     allSentiments = []
     if useTwitter:
-        Client = tweepy.Client(bearer_token=bearerToken, wait_on_rate_limit=True)
+        Client = tweepy.Client(bearer_token=bearerToken, wait_on_rate_limit=False)
         query = f"{symbol} -is:retweet lang:en"
         response = Client.search_recent_tweets(query = query)
-        for tweet in response.data:
+        for tweet in response.data or []:
             sentiment = sentiment_pipeline(tweet.text)
             allSentiments.append(sentiment[0]['label'])
 
@@ -80,7 +80,8 @@ def get_sentiment(symbol, useTwitter = False):
     today.strftime("%Y-%m-%d")
     two_week_ago.strftime("%Y-%m-%d")
     url = f"https://newsapi.org/v2/everything?q={symbol}&searchIn=title&sortyBy=popularity&from={two_week_ago}&to={today}&language=en&apiKey={newsAPI}"
-    response = requests.get(url)
+    response = requests.get(url, timeout=15)
+    response.raise_for_status()
     response = response.json()
     for article in response['articles']:
         sentiment = sentiment_pipeline(article['title'])
@@ -107,7 +108,6 @@ if __name__ == "__main__":
         print(f"The sentiment for {symbol} is: {get_sentiment(symbol, use_twitter)}")
     else:
         print("Please provide a stock symbol as an argument.")
-
 
 
 

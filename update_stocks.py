@@ -36,9 +36,12 @@ popular_stocks = [
 
 
 try:
-    connection = mysql.connector.connect(user='root', password='',
-                              host='127.0.0.1',
-                              database='Trading')
+    connection = mysql.connector.connect(user=os.getenv('MYSQL_USER', 'root'),
+                              password=os.getenv('MYSQL_PASSWORD', ''),
+                              host=os.getenv('MYSQL_HOST', '127.0.0.1'),
+                              port=int(os.getenv('MYSQL_PORT', '3306')),
+                              database=os.getenv('MYSQL_DATABASE', 'trading'),
+                              connection_timeout=10)
 
 except mysql.connector.Error as err:
   if err.errno == errorcode.ER_ACCESS_DENIED_ERROR:
@@ -47,6 +50,7 @@ except mysql.connector.Error as err:
     print("Database does not exist")
   else:
     print(err)
+  raise
 else:
   print('Connection successful')
 
@@ -54,18 +58,20 @@ cursor = connection.cursor()
 
 for symbol in popular_stocks:
     alphaUrl = 'https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol='+symbol+'&apikey='+ apiKey
-    r = requests.get(alphaUrl)
+    r = requests.get(alphaUrl, timeout=15)
+    r.raise_for_status()
     data = r.json()
     price =  data['Global Quote']['02. open'] 
     price = float(price)
-    r = requests.get('https://ticker-2e1ica8b9.now.sh/keyword/' + symbol)
+    r = requests.get('https://ticker-2e1ica8b9.now.sh/keyword/' + symbol, timeout=15)
+    r.raise_for_status()
     data = r.json()
     for element in data:
         if element['symbol'] == symbol:
             name = element['name']
             break
 
-    addStock = ("INSERT INTO stocks (Symbol, CompanyName, StockPrice) "
+    addStock = ("INSERT INTO Stocks (Symbol, CompanyName, StockPrice) "
                 "VALUES (%s, %s, %s) "
                 "ON DUPLICATE KEY UPDATE "
                 "CompanyName = VALUES(CompanyName), "
@@ -73,7 +79,7 @@ for symbol in popular_stocks:
     stockData= (symbol, name, price)
 
     cursor.execute(addStock, stockData)
+    connection.commit()
 
-connection.commit()
 cursor.close()
 connection.close()

@@ -1,0 +1,29 @@
+CREATE TABLE IF NOT EXISTS Users (
+    UserID INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    Username VARCHAR(64) NOT NULL UNIQUE,
+    Password VARCHAR(255) NOT NULL,
+    Balance DECIMAL(20,4) NOT NULL DEFAULT 0,
+    CHECK (Balance >= 0)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS Stocks (
+    Symbol VARCHAR(16) NOT NULL PRIMARY KEY,
+    CompanyName VARCHAR(255) NOT NULL,
+    StockPrice DECIMAL(20,4) NOT NULL,
+    CHECK (StockPrice > 0)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS Transactions (
+    TransactionID BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    UserID INT NOT NULL,
+    Symbol VARCHAR(16) NOT NULL,
+    Quantity INT NOT NULL,
+    PriceAtTransaction DECIMAL(20,4) NOT NULL,
+    Type ENUM('Buy', 'Sell') NOT NULL,
+    Date TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    INDEX account_symbol (UserID, Symbol),
+    FOREIGN KEY (UserID) REFERENCES Users(UserID),
+    FOREIGN KEY (Symbol) REFERENCES Stocks(Symbol),
+    CHECK (Quantity > 0),
+    CHECK (PriceAtTransaction > 0)
+) ENGINE=InnoDB;
